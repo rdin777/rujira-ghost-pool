@@ -31,3 +31,13 @@ Since the protocol requires a successful deposit to function, the entire vault b
 ## Remediation
 * Implement **Virtual Shares/Assets** (offset) to prevent the ratio from being easily manipulated.
 * Burn a small amount of "Dead Shares" to the zero address during the first deposit.
+
+  ### Detailed Attack Flow:
+1. **Initial State**: A borrower has a significant debt. The protocol calculates interest based on `Δt = current_time - last_updated`.
+2. **Precision Threshold**: For the specific debt size and interest rate, the interest becomes >= 1 unit (e.g., 1 uatom) only after 5 seconds of elapsed time.
+3. **The Exploit**: 
+   - An attacker (or a bot) calls any function that triggers `calculate_interest` (e.g., a small deposit or a dummy update) every **1-4 seconds**.
+   - Because `Δt` is small, `interest_to_accrue` is calculated as `< 1.0`.
+   - `DecimalScaled::decompose()` uses `.to_uint_floor()`, rounding this value down to **0**.
+   - The state variable `last_updated` is set to `current_time`.
+4. **Outcome**: The clock is reset, the fractional interest is discarded, and the borrower's debt stays exactly the same despite time passing.
