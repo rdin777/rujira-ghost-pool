@@ -41,3 +41,18 @@ Since the protocol requires a successful deposit to function, the entire vault b
    - `DecimalScaled::decompose()` uses `.to_uint_floor()`, rounding this value down to **0**.
    - The state variable `last_updated` is set to `current_time`.
 4. **Outcome**: The clock is reset, the fractional interest is discarded, and the borrower's debt stays exactly the same despite time passing.
+
+## Step-by-Step Attack Scenario (H-01)
+
+1. **Vulnerability Point**: The pool lacks "Dead Shares" and uses a strict `issuance.is_zero()` check that reverts.
+2. **Step 1 (The Hook)**: Attacker calls `join(1)`. 
+   - `self.shares` becomes 1.
+   - `self.size` becomes 1.
+3. **Step 2 (The Inflation)**: Attacker sends 1,000,000 ATOM ($10^{24}$ units) directly to the contract address via `BankMsg`.
+   - `self.size` is now $10^{24} + 1$.
+   - `self.shares` is still 1.
+4. **Step 3 (The DoS)**: A legitimate user tries to deposit 10,000 ATOM ($10^{22}$ units).
+   - Calculation: `issuance = (shares * amount) / size`
+   - `issuance = (1 * 10^{22}) / (10^{24} + 1) = 0.01`
+   - `issuance.floor()` returns **0**.
+5. **Final Result**: The contract hits `return Err(SharePoolError::Zero("Shares"))`. The transaction reverts. No one can ever enter the pool again.
